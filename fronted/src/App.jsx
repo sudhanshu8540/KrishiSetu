@@ -173,19 +173,26 @@ function App() {
         setLocation({ lat, lon });
 
         try {
+          // Fetch weather directly from the browser so the shared Render
+          // server IP does not hit Open-Meteo's rate limit.
           const response = await fetch(
-            `https://krishisetu-pd8r.onrender.com/weather?lat=${lat}&lon=${lon}`
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,rain,wind_speed_10m&timezone=auto`,
+            { cache: "no-store" }
           );
 
-          if (!response.ok) throw new Error("Weather request failed");
+          if (!response.ok) throw new Error(`Weather request failed (${response.status})`);
 
           const data = await response.json();
           setWeather(data);
           setWeatherRisk(calculateWeatherRisk(data));
         } catch (err) {
-          console.error(err);
+          console.error("Direct weather error:", err);
           setWeather(null);
-          setWeatherRisk("Weather data unavailable");
+          setWeatherRisk(
+            language === "hi"
+              ? "मौसम की जानकारी अभी उपलब्ध नहीं है"
+              : "Weather data unavailable"
+          );
         }
       },
       () => {
@@ -381,6 +388,9 @@ function App() {
     formData.append("lon", lon);
     formData.append("language", language);
     formData.append("farmer_note", voiceText);
+    // Send browser-fetched weather to the backend so Gemini can use it
+    // without making another Open-Meteo request from Render.
+    formData.append("weather_json", weather ? JSON.stringify(weather) : "");
 
     try {
       const response = await fetch(

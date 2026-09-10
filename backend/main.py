@@ -1,5 +1,6 @@
 import os
 import asyncio
+import time
 import httpx
 import firebase_admin
 from firebase_admin import firestore
@@ -32,11 +33,13 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 # models and support image input. If a model is temporarily overloaded (503),
 # KrishiSetu automatically tries the next one.
 GEMINI_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
     "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash",
+    "gemini-3.8-flash",
 ]
 
 
@@ -70,17 +73,79 @@ app.add_middleware(
 )
 
 
-async def get_weather(lat: float, lon: float):
-    url = (
-        "https://api.open-meteo.com/v1/forecast"
-        f"?latitude={lat}&longitude={lon}"
-        "&current=temperature_2m,relative_humidity_2m,precipitation,rain,wind_speed_10m"
-    )
+# Weather cache: browser location + analysis can otherwise hit Open-Meteo twice
+# within seconds. Keep a successful result for 15 minutes and reuse the last
+# successful result for up to 6 hours if the upstream API is temporarily 429.
+WEATHER_CACHE_TTL = 15 * 60
+WEATHER_STALE_TTL = 6 * 60 * 60
+weather_cache = {}
+weather_lock = asyncio.Lock()
 
-    async with httpx.AsyncClient(timeout=15) as http_client:
-        response = await http_client.get(url)
-        response.raise_for_status()
-        return response.json()
+
+async def get_weather(lat: float, lon: float):
+    # Round coordinates so tiny GPS changes do not create a new API request.
+    key = (round(lat, 2), round(lon, 2))
+    now = time.time()
+
+    cached = weather_cache.get(key)
+    if cached and now - cached["time"] < WEATHER_CACHE_TTL:
+        print(f"Weather cache hit: {key}")
+        return cached["data"]
+
+    # Only one request at a time. This prevents duplicate calls when the
+    # frontend asks for weather and /analyze-crop asks for it simultaneously.
+    async with weather_lock:
+        now = time.time()
+        cached = weather_cache.get(key)
+        if cached and now - cached["time"] < WEATHER_CACHE_TTL:
+            print(f"Weather cache hit after lock: {key}")
+            return cached["data"]
+
+        url = (
+            "https://api.open-meteo.com/v1/forecast"
+            f"?latitude={lat}&longitude={lon}"
+            "&current=temperature_2m,relative_humidity_2m,precipitation,rain,wind_speed_10m"
+            "&timezone=auto"
+        )
+
+        last_error = None
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=15) as http_client:
+                    response = await http_client.get(url)
+                    response.raise_for_status()
+                    data = response.json()
+
+                weather_cache[key] = {"time": time.time(), "data": data}
+                print(f"Weather fetched successfully: {key}")
+                return data
+
+            except httpx.HTTPStatusError as error:
+                last_error = error
+                status = error.response.status_code
+                if status != 429 and status < 500:
+                    break
+                if attempt < 2:
+                    wait_seconds = 2 * (attempt + 1)
+                    print(
+                        f"Open-Meteo returned {status}. "
+                        f"Retrying in {wait_seconds}s..."
+                    )
+                    await asyncio.sleep(wait_seconds)
+
+            except Exception as error:
+                last_error = error
+                if attempt < 2:
+                    await asyncio.sleep(2 * (attempt + 1))
+
+        # If Open-Meteo is temporarily rate-limited, stale-but-real weather is
+        # much better for the farmer dashboard than deleting the weather cards.
+        cached = weather_cache.get(key)
+        if cached and time.time() - cached["time"] < WEATHER_STALE_TTL:
+            print(f"Using stale weather cache after upstream failure: {key}")
+            return cached["data"]
+
+        raise last_error
 
 
 def _is_temporary_gemini_error(error):
@@ -91,6 +156,10 @@ def _is_temporary_gemini_error(error):
         or "SERVICE UNAVAILABLE" in text
         or "OVERLOADED" in text
         or "HIGH DEMAND" in text
+        or "429" in text
+        or "RESOURCE_EXHAUSTED" in text
+        or "RATE LIMIT" in text
+        or "QUOTA" in text
     )
 
 
@@ -161,6 +230,7 @@ async def analyze_crop(
     lon: float = 77.2100,
     language: str = Form("en"),
     farmer_note: str = Form(""),
+    weather_json: str = Form(""),
 ):
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(
@@ -200,8 +270,12 @@ async def analyze_crop(
         selected_language = "en"
     selected_language_name, speech_locale = language_aliases[selected_language]
 
+    # Prefer weather supplied by the browser. This avoids Open-Meteo
+    # rate-limiting the shared Render server IP during the crop analysis.
     try:
-        weather_data = await get_weather(lat, lon)
+        weather_data = json.loads(weather_json) if weather_json.strip() else await get_weather(lat, lon)
+        if not isinstance(weather_data, dict):
+            raise ValueError("Invalid weather payload")
     except Exception as error:
         print("Weather error:", error)
         weather_data = {
