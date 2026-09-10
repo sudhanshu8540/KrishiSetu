@@ -59,8 +59,12 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
-    allow_credentials=True,
+    # Public demo frontend + local development.
+    # KrishiSetu does not use cookie/session authentication,
+    # so wildcard CORS is safe for this prototype and avoids
+    # Render preview/domain mismatch issues.
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

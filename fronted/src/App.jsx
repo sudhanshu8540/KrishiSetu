@@ -45,7 +45,7 @@ function App() {
   const refreshScans = async () => {
     setHistoryLoading(true);
     try {
-      const response = await fetch("http://127.0.0.1:8001/scans", { cache: "no-store" });
+      const response = await fetch("https://krishisetu-pd8r.onrender.com/scans", { cache: "no-store" });
       if (!response.ok) throw new Error("History request failed");
       const data = await response.json();
       setScans(Array.isArray(data) ? data : []);
@@ -83,7 +83,7 @@ function App() {
     setHistoryLoading(true);
     setError("");
     try {
-      const response = await fetch("http://127.0.0.1:8001/scans", { method: "DELETE" });
+      const response = await fetch("https://krishisetu-pd8r.onrender.com/scans", { method: "DELETE" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.detail || "Could not clear history");
       setScans([]);
@@ -127,6 +127,18 @@ function App() {
     const section = parts.find((part) => part.startsWith(`${name}:`));
 
     return section ? section.replace(`${name}:`, "").trim() : "";
+  };
+
+  const getActionSteps = () => {
+    const action = getSection("ACTION");
+    if (!action) return [];
+
+    const matches = action
+      .split(/(?=\b\d+\.\s+)/)
+      .map((step) => step.replace(/^\s*\d+\.\s*/, "").trim())
+      .filter(Boolean);
+
+    return matches.length ? matches : [action];
   };
 
   const calculateWeatherRisk = (data) => {
@@ -174,7 +186,7 @@ function App() {
 
         try {
           const response = await fetch(
-            `http://127.0.0.1:8001/weather?lat=${lat}&lon=${lon}`
+            `https://krishisetu-pd8r.onrender.com/weather?lat=${lat}&lon=${lon}`
           );
 
           if (!response.ok) throw new Error("Weather request failed");
@@ -384,7 +396,7 @@ function App() {
 
     try {
       const response = await fetch(
-        "http://127.0.0.1:8001/analyze-crop",
+        "https://krishisetu-pd8r.onrender.com/analyze-crop",
         {
           method: "POST",
           body: formData,
@@ -1177,6 +1189,26 @@ function App() {
           gap: 11px;
           margin-bottom: 16px;
         }
+        .analysis-head-copy {
+          min-width: 0;
+          flex: 1;
+        }
+        .analysis-source-pill {
+          flex: 0 0 auto;
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 10px;
+          border-radius: 999px;
+          background: #f0f7f1;
+          border: 1px solid #dceade;
+          color: #3d7650;
+          font-size: 10px;
+          font-weight: 800;
+        }
+        .analysis-source-pill span {
+          font-size: 12px;
+        }
         .analysis-head-icon {
           width: 42px;
           height: 42px;
@@ -1203,7 +1235,7 @@ function App() {
           gap: 11px;
         }
         .analysis-item {
-          min-height: 100px;
+          min-height: 116px;
           padding: 14px;
           border-radius: 14px;
           background: #fbfdfb;
@@ -1235,34 +1267,57 @@ function App() {
           margin: 0;
           color: #294238;
           font-size: 14px;
-          line-height: 1.45;
+          line-height: 1.55;
           font-weight: 650;
         }
         .action {
           margin-top: 11px;
-          padding: 15px;
-          border-radius: 14px;
-          background: linear-gradient(135deg, #eef9ef, #f5fbf5);
+          padding: 16px;
+          border-radius: 15px;
+          background: linear-gradient(135deg, #eef9ef, #f7fcf7);
           border: 1px solid #dbeedc;
           display: flex;
           gap: 11px;
           align-items: flex-start;
         }
         .action-icon {
-          width: 39px;
-          height: 39px;
-          border-radius: 11px;
+          width: 41px;
+          height: 41px;
+          border-radius: 12px;
           background: #dff1e1;
           display: grid;
           place-items: center;
           font-size: 19px;
-          flex: 0 0 39px;
+          flex: 0 0 41px;
         }
-        .action-text {
-          margin: 0;
+        .action-content {
+          min-width: 0;
+          flex: 1;
+        }
+        .action-steps {
+          display: grid;
+          gap: 8px;
+        }
+        .action-step {
+          display: grid;
+          grid-template-columns: 24px 1fr;
+          gap: 8px;
+          align-items: start;
           color: #2b4739;
           font-size: 14px;
           line-height: 1.5;
+        }
+        .step-number {
+          width: 24px;
+          height: 24px;
+          border-radius: 8px;
+          display: grid;
+          place-items: center;
+          background: white;
+          border: 1px solid #d4e8d6;
+          color: #2e7544;
+          font-size: 11px;
+          font-weight: 900;
         }
 
         .dashboard-kicker { color: #4f8066; font-size: 10px; font-weight: 900; letter-spacing: .12em; margin-bottom: 4px; }
@@ -1973,9 +2028,13 @@ function App() {
           <section className="card analysis-card">
             <div className="analysis-head">
               <div className="analysis-head-icon">🤖</div>
-              <div>
-                <h3>AI Crop Analysis</h3>
+              <div className="analysis-head-copy">
+                <h3>{language === "hi" ? "AI फसल विश्लेषण" : "AI Crop Analysis"}</h3>
                 <p>{language === "hi" ? "KrishiSetu AI से आपकी फसल की व्यक्तिगत जानकारी" : "Personalized crop insights from KrishiSetu AI"}</p>
+              </div>
+              <div className="analysis-source-pill">
+                <span>✦</span>
+                {language === "hi" ? "AI + मौसम संदर्भ" : "AI + Weather Context"}
               </div>
             </div>
 
@@ -2017,9 +2076,16 @@ function App() {
 
             <div className="action">
               <div className="action-icon">👨‍🌾</div>
-              <div>
-                <span className="analysis-label">{language === "hi" ? "अनुशंसित कार्रवाई" : "Recommended Action"}</span>
-                <p className="action-text">{getSection("ACTION") || "—"}</p>
+              <div className="action-content">
+                <span className="analysis-label">{language === "hi" ? "अभी क्या करें" : "What to do now"}</span>
+                <div className="action-steps">
+                  {getActionSteps().map((step, index) => (
+                    <div className="action-step" key={`${index}-${step.slice(0, 18)}`}>
+                      <span className="step-number">{index + 1}</span>
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
