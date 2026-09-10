@@ -11,7 +11,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Firebase / Firestore
-firebase_admin.initialize_app()
+import base64
+import json
+
+firebase_b64 = os.getenv("FIREBASE_SERVICE_ACCOUNT_B64")
+
+if firebase_b64:
+    firebase_json = json.loads(base64.b64decode(firebase_b64).decode("utf-8"))
+    cred = firebase_admin.credentials.Certificate(firebase_json)
+    firebase_admin.initialize_app(cred)
+else:
+    firebase_admin.initialize_app()
+
 db = firestore.client()
 
 # Gemini
