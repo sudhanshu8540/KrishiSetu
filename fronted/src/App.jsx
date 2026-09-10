@@ -129,18 +129,6 @@ function App() {
     return section ? section.replace(`${name}:`, "").trim() : "";
   };
 
-  const getActionSteps = () => {
-    const action = getSection("ACTION");
-    if (!action) return [];
-
-    const matches = action
-      .split(/(?=\b\d+\.\s+)/)
-      .map((step) => step.replace(/^\s*\d+\.\s*/, "").trim())
-      .filter(Boolean);
-
-    return matches.length ? matches : [action];
-  };
-
   const calculateWeatherRisk = (data) => {
     const humidity = Number(data?.current?.relative_humidity_2m ?? 0);
     const rain = Number(data?.current?.rain ?? 0);
@@ -1189,26 +1177,6 @@ function App() {
           gap: 11px;
           margin-bottom: 16px;
         }
-        .analysis-head-copy {
-          min-width: 0;
-          flex: 1;
-        }
-        .analysis-source-pill {
-          flex: 0 0 auto;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 7px 10px;
-          border-radius: 999px;
-          background: #f0f7f1;
-          border: 1px solid #dceade;
-          color: #3d7650;
-          font-size: 10px;
-          font-weight: 800;
-        }
-        .analysis-source-pill span {
-          font-size: 12px;
-        }
         .analysis-head-icon {
           width: 42px;
           height: 42px;
@@ -1235,7 +1203,7 @@ function App() {
           gap: 11px;
         }
         .analysis-item {
-          min-height: 116px;
+          min-height: 100px;
           padding: 14px;
           border-radius: 14px;
           background: #fbfdfb;
@@ -1267,57 +1235,34 @@ function App() {
           margin: 0;
           color: #294238;
           font-size: 14px;
-          line-height: 1.55;
+          line-height: 1.45;
           font-weight: 650;
         }
         .action {
           margin-top: 11px;
-          padding: 16px;
-          border-radius: 15px;
-          background: linear-gradient(135deg, #eef9ef, #f7fcf7);
+          padding: 15px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, #eef9ef, #f5fbf5);
           border: 1px solid #dbeedc;
           display: flex;
           gap: 11px;
           align-items: flex-start;
         }
         .action-icon {
-          width: 41px;
-          height: 41px;
-          border-radius: 12px;
+          width: 39px;
+          height: 39px;
+          border-radius: 11px;
           background: #dff1e1;
           display: grid;
           place-items: center;
           font-size: 19px;
-          flex: 0 0 41px;
+          flex: 0 0 39px;
         }
-        .action-content {
-          min-width: 0;
-          flex: 1;
-        }
-        .action-steps {
-          display: grid;
-          gap: 8px;
-        }
-        .action-step {
-          display: grid;
-          grid-template-columns: 24px 1fr;
-          gap: 8px;
-          align-items: start;
+        .action-text {
+          margin: 0;
           color: #2b4739;
           font-size: 14px;
           line-height: 1.5;
-        }
-        .step-number {
-          width: 24px;
-          height: 24px;
-          border-radius: 8px;
-          display: grid;
-          place-items: center;
-          background: white;
-          border: 1px solid #d4e8d6;
-          color: #2e7544;
-          font-size: 11px;
-          font-weight: 900;
         }
 
         .dashboard-kicker { color: #4f8066; font-size: 10px; font-weight: 900; letter-spacing: .12em; margin-bottom: 4px; }
@@ -2028,13 +1973,9 @@ function App() {
           <section className="card analysis-card">
             <div className="analysis-head">
               <div className="analysis-head-icon">🤖</div>
-              <div className="analysis-head-copy">
-                <h3>{language === "hi" ? "AI फसल विश्लेषण" : "AI Crop Analysis"}</h3>
+              <div>
+                <h3>AI Crop Analysis</h3>
                 <p>{language === "hi" ? "KrishiSetu AI से आपकी फसल की व्यक्तिगत जानकारी" : "Personalized crop insights from KrishiSetu AI"}</p>
-              </div>
-              <div className="analysis-source-pill">
-                <span>✦</span>
-                {language === "hi" ? "AI + मौसम संदर्भ" : "AI + Weather Context"}
               </div>
             </div>
 
@@ -2076,16 +2017,9 @@ function App() {
 
             <div className="action">
               <div className="action-icon">👨‍🌾</div>
-              <div className="action-content">
-                <span className="analysis-label">{language === "hi" ? "अभी क्या करें" : "What to do now"}</span>
-                <div className="action-steps">
-                  {getActionSteps().map((step, index) => (
-                    <div className="action-step" key={`${index}-${step.slice(0, 18)}`}>
-                      <span className="step-number">{index + 1}</span>
-                      <span>{step}</span>
-                    </div>
-                  ))}
-                </div>
+              <div>
+                <span className="analysis-label">{language === "hi" ? "अनुशंसित कार्रवाई" : "Recommended Action"}</span>
+                <p className="action-text">{getSection("ACTION") || "—"}</p>
               </div>
             </div>
 
