@@ -393,23 +393,46 @@ function App() {
     formData.append("weather_json", weather ? JSON.stringify(weather) : "");
 
     try {
-      const response = await fetch(
-        "https://krishisetu-pd8r.onrender.com/analyze-crop",
-        {
-          method: "POST",
-          body: formData,
+      let lastError = null;
+
+      // Gemini free-tier limits can briefly return 429/503. Retry once after
+      // the short quota window instead of immediately showing a hard error.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await fetch(
+          "https://krishisetu-pd8r.onrender.com/analyze-crop",
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+          setAnalysis(data.analysis || "No analysis returned.");
+          await refreshScans();
+          return;
         }
-      );
 
-      const data = await response.json();
+        const detail = String(data?.detail || "Crop analysis failed");
+        lastError = new Error(detail);
+        const temporaryGeminiIssue =
+          response.status === 429 ||
+          response.status === 503 ||
+          /RESOURCE_EXHAUSTED|429|QUOTA|temporarily|high demand|unavailable/i.test(detail);
 
-      if (!response.ok) {
-        throw new Error(data?.detail || "Crop analysis failed");
+        if (!temporaryGeminiIssue || attempt === 1) break;
+
+        setError(
+          language === "hi"
+            ? "AI सेवा अभी व्यस्त है। KrishiSetu अपने-आप दोबारा कोशिश करेगा…"
+            : "AI service is busy right now. KrishiSetu will retry automatically…"
+        );
+        await new Promise((resolve) => setTimeout(resolve, 60000));
+        setError("");
       }
 
-      setAnalysis(data.analysis || "No analysis returned.");
-
-      await refreshScans();
+      throw lastError || new Error("Crop analysis failed");
     } catch (err) {
       console.error(err);
       setError(err.message || "Something went wrong while analyzing the crop.");
