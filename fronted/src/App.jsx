@@ -1851,12 +1851,39 @@ function App() {
         }
 
         @media (max-width: 600px) {
-          .topbar { height: 72px; }
-          .topbar-inner { padding: 0 16px; }
+          .topbar { height: 94px; }
+          .topbar-inner { padding: 0 12px; }
+          .brand {
+            position: absolute;
+            top: 9px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: max-content;
+            gap: 8px;
+          }
+          .brand-mark {
+            width: 30px;
+            height: 30px;
+            flex-basis: 30px;
+            border-radius: 9px;
+            font-size: 17px;
+          }
           .brand h1 { font-size: 20px; }
           .brand p, .top-status { display: none; }
-          .language-switcher { left: 12px; }
-          .language-select { padding: 7px 24px 7px 8px; font-size: 11px; max-width: 170px; }
+          .language-switcher {
+            left: 50%;
+            top: auto;
+            bottom: 9px;
+            transform: translateX(-50%);
+            padding: 3px;
+            width: max-content;
+            max-width: calc(100% - 24px);
+          }
+          .language-select {
+            padding: 6px 28px 6px 8px;
+            font-size: 10.5px;
+            max-width: 190px;
+          }
           .shell { padding: 15px 14px 30px; }
           .hero h2 { font-size: 32px; }
           .hero-description { font-size: 14px; }
