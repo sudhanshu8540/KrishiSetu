@@ -1556,13 +1556,20 @@ function App() {
           white-space: nowrap;
         }
         .health-pill {
-          flex: 0 0 auto;
+          flex: 0 1 auto;
+          max-width: 58%;
+          min-width: 0;
           padding: 4px 9px;
           border-radius: 99px;
           background: #e5f5e7;
           color: #2b6a3a;
           font-size: 10px;
           font-weight: 800;
+          line-height: 1.3;
+          white-space: normal;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+          text-align: center;
         }
         .history-location {
           margin: 6px 0 0;
@@ -1574,6 +1581,8 @@ function App() {
           color: #66756e;
           font-size: 11px;
           line-height: 1.4;
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
         .history-heading {
           align-items: center;
@@ -1606,9 +1615,11 @@ function App() {
         }
         .history-item {
           width: 100%;
+          min-width: 0;
           text-align: left;
           font: inherit;
           cursor: pointer;
+          overflow: hidden;
           transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
         }
         .history-item:hover {
