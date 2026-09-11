@@ -288,10 +288,18 @@ async def analyze_crop(
     farmer_note = farmer_note.strip()[:1000]
 
     language_instruction = f"""
-Write ALL farmer-facing explanatory content in simple, natural {selected_language_name}.
-Use the normal script used by speakers of that language. Keep words easy enough for a farmer.
-Do not mix English into the explanation unless a crop/disease name has no natural local equivalent.
-For Bhojpuri, use simple Bhojpuri written in Devanagari.
+LANGUAGE IS A HARD REQUIREMENT.
+The selected farmer-facing language is: {selected_language_name}.
+
+If the selected language is English:
+- Write EVERY explanatory sentence in English only.
+- NEVER use Hindi, Devanagari, Hinglish, or any other Indian-language script in the answer.
+- Even if the image, farmer voice note, crop name, or context is in Hindi, translate/summarize it into English.
+- Crop and disease names may remain in standard English/scientific terminology.
+
+If the selected language is not English:
+- Write all explanatory content in the selected language and its normal script.
+- For Bhojpuri, use simple Bhojpuri written in Devanagari.
 
 IMPORTANT:
 - Keep these five section headings EXACTLY in English for app parsing:
@@ -300,7 +308,7 @@ IMPORTANT:
   DISEASE_RISK:
   WEATHER_RISK:
   ACTION:
-- Only the content after those headings should be in {selected_language_name}.
+- Only the content after those headings should be in the selected language.
 - ACTION must contain 3 short, practical steps.
 - Do not output JSON, markdown tables, or extra headings.
 """
