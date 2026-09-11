@@ -33,9 +33,11 @@ client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 # models and support image input. If a model is temporarily overloaded (503),
 # KrishiSetu automatically tries the next one.
 GEMINI_MODELS = [
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
+    # Current stable models. 2.5 Flash-Lite was returning 404 for this project,
+    # so do not use it as a fallback.
+    "gemini-3.1-flash-lite",
     "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
     "gemini-3.5-flash",
     "gemini-3.6-flash",
     "gemini-3.7-flash",
