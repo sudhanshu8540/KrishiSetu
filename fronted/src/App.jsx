@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { setOptions, importLibrary } from "@googlemaps/js-api-loader";
+import { signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
 
 const LANGUAGE_OPTIONS = [
   { code: "en", label: "English", native: "English", speech: "en-IN" },
@@ -26,6 +28,34 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [location, setLocation] = useState(null);
+  const [user, setUser] = useState(null);
+  useEffect(() => {
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+  });
+
+  return () => unsubscribe();
+}, []);
+  const handleGoogleLogin = async () => {
+    try {
+      setError("");
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      console.error("Google login error:", err);
+      setError("Google sign-in was cancelled or failed. Please try again.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (err) {
+      console.error("Logout error:", err);
+      setError("Could not sign out. Please try again.");
+    }
+  };
   const [weather, setWeather] = useState(null);
   const [weatherRisk, setWeatherRisk] = useState("");
   const [scans, setScans] = useState([]);
@@ -43,9 +73,16 @@ function App() {
   const mapInstanceRef = useRef(null);
 
   const refreshScans = async () => {
+    if (!user) return;
     setHistoryLoading(true);
     try {
-      const response = await fetch("https://krishisetu-pd8r.onrender.com/scans", { cache: "no-store" });
+      const idToken = await user.getIdToken();
+      const response = await fetch("https://krishisetu-pd8r.onrender.com/scans", {
+        cache: "no-store",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
       if (!response.ok) throw new Error("History request failed");
       const data = await response.json();
       setScans(Array.isArray(data) ? data : []);
@@ -59,7 +96,7 @@ function App() {
 
   useEffect(() => {
     refreshScans();
-  }, []);
+  }, [user]);
 
   const resetCurrentScan = () => {
     window.speechSynthesis?.cancel();
@@ -83,7 +120,13 @@ function App() {
     setHistoryLoading(true);
     setError("");
     try {
-      const response = await fetch("https://krishisetu-pd8r.onrender.com/scans", { method: "DELETE" });
+      const idToken = await user.getIdToken();
+      const response = await fetch("https://krishisetu-pd8r.onrender.com/scans", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+      });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.detail || "Could not clear history");
       setScans([]);
@@ -402,6 +445,9 @@ function App() {
           "https://krishisetu-pd8r.onrender.com/analyze-crop",
           {
             method: "POST",
+            headers: {
+              Authorization: `Bearer ${await user.getIdToken()}`,
+            },
             body: formData,
           }
         );
@@ -678,6 +724,46 @@ function App() {
     initMap();
   }, [riskScans, regionalHotspots, location]);
 
+  if (!user) {
+    return (
+      <div style={{
+        minHeight: "100vh", display: "grid", placeItems: "center", padding: "24px",
+        background: "linear-gradient(135deg, #eef8ef, #f8fbf8)",
+        fontFamily: 'Inter, "Segoe UI", Arial, sans-serif'
+      }}>
+        <div style={{
+          width: "100%", maxWidth: "430px", padding: "34px", borderRadius: "24px",
+          background: "white", border: "1px solid #dfeae1",
+          boxShadow: "0 16px 45px rgba(31, 63, 43, .10)", textAlign: "center"
+        }}>
+          <div style={{
+            width: "58px", height: "58px", margin: "0 auto 14px", borderRadius: "17px",
+            display: "grid", placeItems: "center", background: "#e4f3e6", fontSize: "30px"
+          }}>🌾</div>
+          <h1 style={{ margin: 0, color: "#124d32", fontSize: "30px" }}>KrishiSetu AI</h1>
+          <p style={{ margin: "9px 0 24px", color: "#66756e", fontSize: "14px", lineHeight: 1.5 }}>
+            Sign in to access your crop intelligence dashboard.
+          </p>
+          <button type="button" onClick={handleGoogleLogin} style={{
+            width: "100%", height: "50px", border: "1px solid #cfdad2", borderRadius: "12px",
+            background: "white", color: "#17362a", fontSize: "15px", fontWeight: 800,
+            cursor: "pointer", boxShadow: "0 4px 12px rgba(31, 63, 43, .06)"
+          }}>
+            <span style={{ marginRight: "9px", fontSize: "17px" }}>G</span>
+            Continue with Google
+          </button>
+          {error && <div style={{
+            marginTop: "14px", padding: "10px 12px", borderRadius: "10px",
+            background: "#fff0f0", color: "#b42323", border: "1px solid #f2d0d0", fontSize: "12px"
+          }}>{error}</div>}
+          <p style={{ margin: "18px 0 0", color: "#8a948e", fontSize: "11px" }}>
+            Secure sign-in powered by Firebase Authentication
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app">
       <style>{`
@@ -842,6 +928,23 @@ function App() {
           background: #8be28e;
           box-shadow: 0 0 0 5px rgba(139,226,142,.12);
         }
+        .user-name {
+          max-width: 150px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .logout-btn {
+          border: 1px solid rgba(255,255,255,.28);
+          border-radius: 9px;
+          padding: 7px 11px;
+          background: rgba(255,255,255,.10);
+          color: white;
+          font-size: 11px;
+          font-weight: 800;
+          cursor: pointer;
+        }
+        .logout-btn:hover { background: rgba(255,255,255,.18); }
 
         .shell {
           max-width: 1240px;
@@ -1820,7 +1923,12 @@ function App() {
 
           <div className="top-status">
             <span className="status-dot"></span>
-            <span>{language === "hi" ? "स्वस्थ फसलें • बेहतर कल" : "Healthy Crops • Brighter Tomorrow"}</span>
+            <span className="user-name" title={user?.displayName || user?.email || "Signed in"}>
+              {user?.displayName || user?.email || "Signed in"}
+            </span>
+            <button type="button" className="logout-btn" onClick={handleLogout}>
+              Sign out
+            </button>
           </div>
         </div>
       </header>
