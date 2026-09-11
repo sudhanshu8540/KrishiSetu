@@ -3,8 +3,8 @@ import asyncio
 import time
 import httpx
 import firebase_admin
-from firebase_admin import firestore
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from firebase_admin import firestore, auth as firebase_auth
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from google import genai
 from dotenv import load_dotenv
@@ -25,6 +25,30 @@ else:
     firebase_admin.initialize_app()
 
 db = firestore.client()
+def verify_firebase_token(authorization: str | None):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required."
+        )
+
+    token = authorization.split(" ", 1)[1].strip()
+
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid authentication token."
+        )
+
+    try:
+        decoded_token = firebase_auth.verify_id_token(token)
+        return decoded_token
+    except Exception as error:
+        print("Firebase token verification error:", error)
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired authentication token."
+        )
 
 # Gemini
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
@@ -233,7 +257,11 @@ async def analyze_crop(
     language: str = Form("en"),
     farmer_note: str = Form(""),
     weather_json: str = Form(""),
+    authorization: str | None = Header(default=None),
 ):
+    decoded_token = verify_firebase_token(authorization)
+    user_id = decoded_token["uid"]
+
     if not file.content_type or not file.content_type.startswith("image/"):
         raise HTTPException(
             status_code=400,
@@ -408,6 +436,7 @@ If the image is unclear, clearly say so.
         "health_level": health_level,
         "disease_level": disease_level,
         "speech_locale": speech_locale,
+        "user_id": user_id,
     })
 
     return {
@@ -437,8 +466,10 @@ async def weather(lat: float, lon: float):
 
 
 @app.get("/scans")
-async def get_scans():
-    docs = db.collection("crop_scans").stream()
+async def get_scans(authorization: str | None = Header(default=None)):
+    decoded_token = verify_firebase_token(authorization)
+    user_id = decoded_token["uid"]
+    docs = db.collection("crop_scans").where("user_id", "==", user_id).stream()
 
     scans = []
 
@@ -451,10 +482,12 @@ async def get_scans():
 
 
 @app.delete("/scans")
-async def clear_scans():
-    """Delete all saved crop observations from Firestore."""
+async def clear_scans(authorization: str | None = Header(default=None)):
+    """Delete all saved crop observations for the authenticated user."""
     try:
-        docs = list(db.collection("crop_scans").stream())
+        decoded_token = verify_firebase_token(authorization)
+        user_id = decoded_token["uid"]
+        docs = list(db.collection("crop_scans").where("user_id", "==", user_id).stream())
         deleted = 0
         for doc in docs:
             doc.reference.delete()
